@@ -618,6 +618,20 @@ nav a:hover::after{
 .footer-note{max-width:650px;margin:20px auto 0;font-size:10px;line-height:1.5;color:#ffe4f0}.footer-copy{margin-top:18px;padding-top:15px;border-top:1px solid rgba(255,255,255,.18);font-size:9px;color:#ffd9e9}
 @media(max-width:600px){.coquette-footer{margin-top:34px;padding:32px 14px 20px}.footer-grid{grid-template-columns:1fr;gap:8px}.footer-block{padding:11px 10px}.footer-brand{font-size:18px}.footer-bow{font-size:25px}}
 </style>
+<style id="groupedProductStyles">
+.variant-modal{display:none;position:fixed;inset:0;z-index:1000;align-items:flex-end;justify-content:center}.variant-modal.open{display:flex}
+.variant-backdrop{position:absolute;inset:0;background:rgba(64,16,42,.48);backdrop-filter:blur(3px)}
+.variant-card{position:relative;width:min(620px,100%);max-height:82vh;overflow:auto;background:#fffafd;border-radius:26px 26px 0 0;padding:25px 18px 28px;box-shadow:0 -12px 40px rgba(181,22,112,.18)}
+.variant-close{position:absolute;right:14px;top:12px;width:34px;height:34px;border:0;border-radius:50%;background:#ffe1ef;color:#a91568;font-size:23px}
+.variant-bow{text-align:center;color:#e0218a;font-size:26px}.variant-category{text-align:center;color:#d21c7d;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;margin-top:5px}
+.variant-card h2{text-align:center;font-family:Georgia,"Times New Roman",serif;color:#5b2941;margin:5px 40px 18px;font-size:25px}
+.variant-list{display:grid;gap:9px}.variant-option{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:13px;border:1px solid #f1cadc;border-radius:15px;background:#fff}
+.variant-option-name{font-weight:700;color:#57213b;font-size:14px}.variant-option-code{font-size:9px;color:#a38391;margin-top:3px}.variant-option-price{font-weight:800;color:#b51670;font-size:14px;white-space:nowrap}
+.variant-option button{grid-column:1/-1;border:0;border-radius:999px;padding:10px;background:linear-gradient(135deg,#e0218a,#b51670);color:#fff;font-weight:700;font-size:11px}
+.variant-option button:disabled{background:#e7d8df;color:#9b8b92}
+.card .variant-count{font-size:8px;color:#a57c8f;margin:3px 0}.card .view-options{background:linear-gradient(135deg,#e0218a,#b51670)!important}
+@media(min-width:701px){.variant-modal{align-items:center}.variant-card{border-radius:26px;max-height:78vh}}
+</style>
 </head>
 <body>
 <div class="top">PEP CORE - BEAUTY • ON-HAND COLLECTION</div>
@@ -810,22 +824,77 @@ function filter(cat){
  document.getElementById("shop").scrollIntoView({behavior:"smooth"});
  render();
 }
+function productFamily(name){
+ const s=String(name||"").trim();
+ // Group strength/size variants by removing trailing dosage/volume.
+ // Examples: "Tirzepatide 15mg" -> "Tirzepatide"; "Bac Water 3mL" -> "Bac Water".
+ return s.replace(/\s+\d+(?:\.\d+)?\s*(?:mg|mcg|g|ml|mL|iu|IU)\b.*$/i,"").trim() || s;
+}
+function groupedProducts(){
+ const groups=new Map();
+ products.forEach(p=>{
+   const family=productFamily(p.name);
+   const key=p.category+"|||"+family.toLowerCase();
+   if(!groups.has(key))groups.set(key,{family,category:p.category,items:[]});
+   groups.get(key).items.push(p);
+ });
+ return Array.from(groups.values());
+}
 function render(){
- const q=document.getElementById("search").value.toLowerCase();
- const list=products.filter(p=>(selected==="All"||p.category===selected)&&p.name.toLowerCase().includes(q));
- document.getElementById("productCount").textContent=list.length+" products";
- document.getElementById("products").innerHTML=list.map(p=>`
+ const q=document.getElementById("search").value.toLowerCase().trim();
+ const groups=groupedProducts().filter(g=>{
+   const categoryOK=selected==="All"||g.category===selected;
+   const searchOK=!q||g.family.toLowerCase().includes(q)||g.items.some(p=>p.name.toLowerCase().includes(q)||String(p.code).toLowerCase().includes(q));
+   return categoryOK&&searchOK;
+ });
+ document.getElementById("productCount").textContent=groups.length+" products";
+ document.getElementById("products").innerHTML=groups.map((g,idx)=>{
+   const available=g.items.filter(p=>!p.oos);
+   const prices=available.map(p=>Number(p.price)).filter(Number.isFinite);
+   const from=prices.length?Math.min(...prices):null;
+   const allOos=!available.length;
+   const single=g.items.length===1;
+   const p=g.items[0];
+   return `
  <article class="card">
-  <div class="pic">${escapeHtml(p.name)}</div>
+  <div class="pic">${escapeHtml(g.family)}</div>
   <div class="card-body">
-   <h3 class="product-name">${escapeHtml(p.name)}</h3>
-   <div class="code">${escapeHtml(p.code)}</div>
-   <div class="tag product-category">${escapeHtml(p.category)}</div>
-   <div class="price">₱${peso(p.price)} / vial</div>
-      <div class="remark ${p.oos?'oos':''}">${p.oos?'OUT OF STOCK':''}</div>
-   <button class="add" ${p.oos?'disabled':''} onclick="add('${String(p.code).replace(/'/g,"\\'")}')">${p.oos?'OUT OF STOCK':'ADD TO CART'}</button>
+   <h3 class="product-name">${escapeHtml(g.family)}</h3>
+   ${single?`<div class="code">${escapeHtml(p.code)}</div>`:`<div class="variant-count">${g.items.length} OPTIONS</div>`}
+   <div class="tag product-category">${escapeHtml(g.category)}</div>
+   <div class="price">${from===null?'Price unavailable':(single?'₱'+peso(from)+' / vial':'From ₱'+peso(from))}</div>
+   <div class="remark ${allOos?'oos':''}">${allOos?'OUT OF STOCK':''}</div>
+   <button class="add ${single?'':'view-options'}" ${allOos?'disabled':''}
+     onclick="${single?`add('${String(p.code).replace(/'/g,"\\'")}')`:`openVariantModal(${idx})`}">
+     ${allOos?'OUT OF STOCK':(single?'ADD TO CART':'VIEW OPTIONS')}
+   </button>
   </div>
- </article>`).join("");
+ </article>`;
+ }).join("");
+ window.__visibleProductGroups=groups;
+}
+function openVariantModal(index){
+ const g=(window.__visibleProductGroups||[])[index]; if(!g)return;
+ document.getElementById("variantCategory").textContent=g.category;
+ document.getElementById("variantTitle").textContent=g.family;
+ document.getElementById("variantList").innerHTML=g.items.map(p=>`
+   <div class="variant-option">
+    <div><div class="variant-option-name">${escapeHtml(p.name)}</div><div class="variant-option-code">${escapeHtml(p.code)}</div></div>
+    <div class="variant-option-price">₱${peso(p.price)}</div>
+    <button ${p.oos?'disabled':''} onclick="addVariant('${String(p.code).replace(/'/g,"\\'")}')">${p.oos?'OUT OF STOCK':'ADD TO CART'}</button>
+   </div>`).join("");
+ const modal=document.getElementById("variantModal");
+ modal.classList.add("open");modal.setAttribute("aria-hidden","false");
+ document.body.style.overflow="hidden";
+}
+function closeVariantModal(){
+ const modal=document.getElementById("variantModal");if(!modal)return;
+ modal.classList.remove("open");modal.setAttribute("aria-hidden","true");
+ document.body.style.overflow="";
+}
+function addVariant(code){
+ closeVariantModal();
+ add(code);
 }
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
 function add(code){
@@ -1068,6 +1137,16 @@ document.addEventListener("change", function(e){
 
 updateDeliveryOptions();updatePaymentQR();loadProductsFromSheet();
 </script>
+<div class="variant-modal" id="variantModal" aria-hidden="true">
+  <div class="variant-backdrop" onclick="closeVariantModal()"></div>
+  <div class="variant-card">
+    <button class="variant-close" onclick="closeVariantModal()" aria-label="Close">×</button>
+    <div class="variant-bow">୨୧</div>
+    <div class="variant-category" id="variantCategory"></div>
+    <h2 id="variantTitle"></h2>
+    <div class="variant-list" id="variantList"></div>
+  </div>
+</div>
 <footer class="coquette-footer">
 <div class="footer-bow">୨୧</div>
 <div class="footer-brand">PEP CORE <span>- BEAUTY</span></div>
