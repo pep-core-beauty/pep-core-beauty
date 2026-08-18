@@ -686,42 +686,34 @@ nav a:hover::after{
 
 
 
-<style id="cartBottomBreakdown">
-.drawer{
-  display:flex !important;
-  flex-direction:column !important;
-  overflow-y:auto !important;
+
+<style id="checkoutBottomBreakdown">
+.checkout-final-summary{
+  margin-top:22px;
+  padding-top:14px;
+  border-top:2px solid #f2c8dc;
 }
-#cartItems{
-  flex:1 0 auto;
+.checkout-final-summary .order-summary{
+  margin:0 !important;
+  padding:0 !important;
+  border:0 !important;
 }
-.cart-bottom-summary{
-  position:sticky;
-  bottom:-25px;
-  z-index:8;
-  margin:18px -25px -25px;
-  padding:8px 25px 25px;
-  background:linear-gradient(to bottom,rgba(255,250,253,.92),#fffafd 22%,#fffafd);
-  border-top:1px solid #f1d3e1;
-  box-shadow:0 -10px 24px rgba(181,22,112,.07);
+.checkout-final-summary .order-summary>div{
+  display:flex;
+  justify-content:space-between;
+  gap:16px;
+  padding:7px 0;
+  font-size:13px;
 }
-.cart-bottom-summary .order-summary{
-  margin-top:0 !important;
-  border-top:0 !important;
-  padding-top:4px !important;
+.checkout-final-summary .order-summary .total{
+  margin-top:5px;
+  padding-top:12px;
+  border-top:1px solid #efcfe0;
+  color:#c31576;
+  font-size:19px;
 }
-.drawer.checkout-open .cart-bottom-summary{
-  position:static;
-  margin:18px 0 0;
-  padding:8px 0 0;
-  box-shadow:none;
-  border-top:1px solid #f1d3e1;
-  background:transparent;
-}
-@media(max-width:600px){
-  .cart-bottom-summary{
-    bottom:-25px;
-  }
+#checkoutActions{
+  margin-top:12px;
 }
 </style>
 
@@ -776,14 +768,7 @@ nav a:hover::after{
 
 <div class="overlay" id="overlay" onclick="closeCart()"></div>
 <aside class="drawer" id="drawer"><button class="close" onclick="closeCart()">×</button><h2>Your Cart</h2><div id="cartItems"></div>
-<div class="cart-bottom-summary">
-  <div class="order-summary">
-    <div><span>Subtotal</span><strong>₱<span id="subtotal">0</span></strong></div>
-    <div id="shippingRow"><span>Shipping</span><strong id="shippingText">Paid upon delivery</strong></div>
-    <div class="total"><span>Total</span><strong>₱<span id="total">0</span></strong></div>
-  </div>
-  <button class="checkout" onclick="showCheckout()">PROCEED TO ORDER</button>
-</div>
+<button class="checkout" onclick="showCheckout()">PROCEED TO ORDER</button>
 <div class="checkout-panel" id="checkoutPanel">
 <label>FULL NAME</label><input id="customerName" placeholder="Customer name">
 <div class="checkout-section-title">CONTACT & DELIVERY DETAILS 🎀</div>
@@ -830,6 +815,15 @@ nav a:hover::after{
 <div class="payment-note">Payment QR / instructions can be inserted here when you provide the final payment details.</div>
 <label>ORDER NOTES</label><textarea id="notes" rows="3" placeholder="Delivery or order notes"></textarea>
 <label>RECEIPT</label><input id="receipt" type="file" accept=".jpg,.jpeg,.png,.pdf">
+
+<div class="checkout-final-summary">
+  <div class="order-summary">
+    <div><span>Subtotal</span><strong>₱<span id="subtotal">0</span></strong></div>
+    <div id="shippingRow"><span>Shipping</span><strong id="shippingText">Paid upon delivery</strong></div>
+    <div class="total"><span>Total</span><strong>₱<span id="total">0</span></strong></div>
+  </div>
+</div>
+
 <div id="checkoutActions"><button class="submit" onclick="submitOrder()">SUBMIT ORDER</button></div>
 </div></aside>
 
@@ -1137,8 +1131,7 @@ function closeCart(){document.getElementById("drawer").classList.remove("open");
 function showCheckout(){
  if(!cart.length){alert("Your cart is empty.");return}
  document.getElementById("checkoutPanel").classList.add("open");
- const drawer=document.getElementById("drawer");
- if(drawer)drawer.classList.add("checkout-open");
+
 }
 
 function updatePaymentQR(){
@@ -1165,8 +1158,7 @@ function closeConfirmation(){
  const checkoutPanel=document.getElementById("checkoutPanel");
  if(checkoutPanel) checkoutPanel.classList.remove("open");
 
- const drawer=document.getElementById("drawer");
- if(drawer) drawer.classList.remove("checkout-open");
+
 }
 
 function submitOrder(){
