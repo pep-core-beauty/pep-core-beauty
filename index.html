@@ -685,19 +685,6 @@ nav a:hover::after{
 </style>
 
 
-<style id="inventoryStockStyles">
-.stock-qty-label{
-  margin-top:4px;
-  font-size:9px;
-  font-weight:700;
-  color:#9a5a78;
-}
-.variant-option .stock-qty-label{
-  color:#9a5a78;
-  text-align:right;
-}
-</style>
-
 </head>
 <body>
 <div class="top">PEP CORE - BEAUTY • ON-HAND COLLECTION</div>
@@ -928,8 +915,11 @@ function render(){
    <h3 class="product-name">${escapeHtml(g.family)}</h3>
    ${single?`<div class="code">${escapeHtml(p.code)}</div>`:`<div class="variant-count">${g.items.length} OPTIONS</div>`}
    <div class="tag product-category">${escapeHtml(g.category)}</div>
-   <div class="price">${from===null?'Price unavailable':(single?'₱'+peso(from)+' / vial':'From ₱'+peso(from))}</div>
-   ${single && p.stockQty !== null && p.stockQty !== undefined ? `<div class="stock-qty-label">${p.stockQty} vial${p.stockQty===1?"":"s"} available</div>` : ""}
+   <div class="price">${from===null?'Price unavailable':(
+     single
+       ? ('₱'+peso(from)+(p.category==="Accessories" ? '' : ' / vial'))
+       : ('From ₱'+peso(from))
+   )}</div>
    <div class="remark ${allOos?'oos':''}">${allOos?'OUT OF STOCK':''}</div>
    <button class="add ${single?'':'view-options'}" ${allOos?'disabled':''}
      onclick="${single?`add('${String(p.code).replace(/'/g,"\\'")}')`:`openVariantModal(${idx})`}">
@@ -947,9 +937,8 @@ function openVariantModal(index){
  document.getElementById("variantList").innerHTML=g.items.map(p=>`
    <div class="variant-option">
     <div><div class="variant-option-name">${escapeHtml(p.name)}</div><div class="variant-option-code">${escapeHtml(p.code)}</div></div>
-    <div class="variant-option-price">₱${peso(p.price)}
+    <div class="variant-option-price">₱${peso(p.price)}${p.category==="Accessories" ? "" : " / vial"}
       ${p.bulk10Price ? `<div class="bulk10-label">🎀 10 vials: ₱${peso(p.bulk10Price)}</div>` : ""}
-      ${p.stockQty !== null && p.stockQty !== undefined ? `<div class="stock-qty-label">${p.stockQty} vial${p.stockQty===1?"":"s"} available</div>` : ""}
     </div>
     ${p.oos ? `<button disabled>OUT OF STOCK</button>` : `
       <div class="variant-buy-row">
