@@ -685,6 +685,46 @@ nav a:hover::after{
 </style>
 
 
+
+<style id="cartBottomBreakdown">
+.drawer{
+  display:flex !important;
+  flex-direction:column !important;
+  overflow-y:auto !important;
+}
+#cartItems{
+  flex:1 0 auto;
+}
+.cart-bottom-summary{
+  position:sticky;
+  bottom:-25px;
+  z-index:8;
+  margin:18px -25px -25px;
+  padding:8px 25px 25px;
+  background:linear-gradient(to bottom,rgba(255,250,253,.92),#fffafd 22%,#fffafd);
+  border-top:1px solid #f1d3e1;
+  box-shadow:0 -10px 24px rgba(181,22,112,.07);
+}
+.cart-bottom-summary .order-summary{
+  margin-top:0 !important;
+  border-top:0 !important;
+  padding-top:4px !important;
+}
+.drawer.checkout-open .cart-bottom-summary{
+  position:static;
+  margin:18px 0 0;
+  padding:8px 0 0;
+  box-shadow:none;
+  border-top:1px solid #f1d3e1;
+  background:transparent;
+}
+@media(max-width:600px){
+  .cart-bottom-summary{
+    bottom:-25px;
+  }
+}
+</style>
+
 </head>
 <body>
 <div class="top">PEP CORE - BEAUTY • ON-HAND COLLECTION</div>
@@ -736,12 +776,14 @@ nav a:hover::after{
 
 <div class="overlay" id="overlay" onclick="closeCart()"></div>
 <aside class="drawer" id="drawer"><button class="close" onclick="closeCart()">×</button><h2>Your Cart</h2><div id="cartItems"></div>
-<div class="order-summary">
-  <div><span>Subtotal</span><strong>₱<span id="subtotal">0</span></strong></div>
-  <div id="shippingRow"><span>Shipping</span><strong id="shippingText">Paid upon delivery</strong></div>
-  <div class="total"><span>Total</span><strong>₱<span id="total">0</span></strong></div>
+<div class="cart-bottom-summary">
+  <div class="order-summary">
+    <div><span>Subtotal</span><strong>₱<span id="subtotal">0</span></strong></div>
+    <div id="shippingRow"><span>Shipping</span><strong id="shippingText">Paid upon delivery</strong></div>
+    <div class="total"><span>Total</span><strong>₱<span id="total">0</span></strong></div>
+  </div>
+  <button class="checkout" onclick="showCheckout()">PROCEED TO ORDER</button>
 </div>
-<button class="checkout" onclick="showCheckout()">PROCEED TO ORDER</button>
 <div class="checkout-panel" id="checkoutPanel">
 <label>FULL NAME</label><input id="customerName" placeholder="Customer name">
 <div class="checkout-section-title">CONTACT & DELIVERY DETAILS 🎀</div>
@@ -1092,7 +1134,12 @@ function change(code,n){
 }
 function openCart(){document.getElementById("drawer").classList.add("open");document.getElementById("overlay").classList.add("open")}
 function closeCart(){document.getElementById("drawer").classList.remove("open");document.getElementById("overlay").classList.remove("open")}
-function showCheckout(){if(!cart.length){alert("Your cart is empty.");return}document.getElementById("checkoutPanel").classList.add("open")}
+function showCheckout(){
+ if(!cart.length){alert("Your cart is empty.");return}
+ document.getElementById("checkoutPanel").classList.add("open");
+ const drawer=document.getElementById("drawer");
+ if(drawer)drawer.classList.add("checkout-open");
+}
 
 function updatePaymentQR(){
  document.querySelectorAll(".payment-qr").forEach(function(el){el.classList.remove("show")});
@@ -1117,6 +1164,9 @@ function closeConfirmation(){
 
  const checkoutPanel=document.getElementById("checkoutPanel");
  if(checkoutPanel) checkoutPanel.classList.remove("open");
+
+ const drawer=document.getElementById("drawer");
+ if(drawer) drawer.classList.remove("checkout-open");
 }
 
 function submitOrder(){
