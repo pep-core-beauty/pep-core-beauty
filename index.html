@@ -684,6 +684,20 @@ nav a:hover::after{
 .cart-item-subtotal{margin-top:4px;font-size:11px;color:#704356}
 </style>
 
+
+<style id="inventoryStockStyles">
+.stock-qty-label{
+  margin-top:4px;
+  font-size:9px;
+  font-weight:700;
+  color:#9a5a78;
+}
+.variant-option .stock-qty-label{
+  color:#9a5a78;
+  text-align:right;
+}
+</style>
+
 </head>
 <body>
 <div class="top">PEP CORE - BEAUTY • ON-HAND COLLECTION</div>
@@ -915,6 +929,7 @@ function render(){
    ${single?`<div class="code">${escapeHtml(p.code)}</div>`:`<div class="variant-count">${g.items.length} OPTIONS</div>`}
    <div class="tag product-category">${escapeHtml(g.category)}</div>
    <div class="price">${from===null?'Price unavailable':(single?'₱'+peso(from)+' / vial':'From ₱'+peso(from))}</div>
+   ${single && p.stockQty !== null && p.stockQty !== undefined ? `<div class="stock-qty-label">${p.stockQty} vial${p.stockQty===1?"":"s"} available</div>` : ""}
    <div class="remark ${allOos?'oos':''}">${allOos?'OUT OF STOCK':''}</div>
    <button class="add ${single?'':'view-options'}" ${allOos?'disabled':''}
      onclick="${single?`add('${String(p.code).replace(/'/g,"\\'")}')`:`openVariantModal(${idx})`}">
@@ -934,6 +949,7 @@ function openVariantModal(index){
     <div><div class="variant-option-name">${escapeHtml(p.name)}</div><div class="variant-option-code">${escapeHtml(p.code)}</div></div>
     <div class="variant-option-price">₱${peso(p.price)}
       ${p.bulk10Price ? `<div class="bulk10-label">🎀 10 vials: ₱${peso(p.bulk10Price)}</div>` : ""}
+      ${p.stockQty !== null && p.stockQty !== undefined ? `<div class="stock-qty-label">${p.stockQty} vial${p.stockQty===1?"":"s"} available</div>` : ""}
     </div>
     ${p.oos ? `<button disabled>OUT OF STOCK</button>` : `
       <div class="variant-buy-row">
@@ -957,8 +973,12 @@ function closeVariantModal(){
 const variantQuantities={};
 
 function changeVariantQty(code,delta){
+ const p=products.find(x=>x.code===code);
  const current=variantQuantities[code] || 1;
- const next=Math.max(1,Math.min(99,current+delta));
+ const maxStock=(p && p.stockQty !== null && p.stockQty !== undefined)
+   ? Math.max(0,Number(p.stockQty))
+   : 99;
+ const next=Math.max(1,Math.min(maxStock || 1,current+delta));
  variantQuantities[code]=next;
  const el=document.getElementById("variantQty-"+code);
  if(el)el.textContent=next;
@@ -970,6 +990,11 @@ function addVariantQty(code){
  if(!p||p.oos)return;
 
  const item=cart.find(x=>x.code===code);
+ const inCart=item ? Number(item.qty||0) : 0;
+ if(p.stockQty !== null && p.stockQty !== undefined && inCart + qty > Number(p.stockQty)){
+   alert(`Only ${p.stockQty} vial${Number(p.stockQty)===1?" is":"s are"} available for ${p.name}.`);
+   return;
+ }
  if(item)item.qty+=qty;
  else cart.push({...p,qty:qty});
 
@@ -986,6 +1011,13 @@ function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':
 function add(code){
  let p=products.find(x=>x.code===code); if(!p||p.oos)return;
  let item=cart.find(x=>x.code===code);
+ if(p.stockQty !== null && p.stockQty !== undefined){
+   const current=item ? Number(item.qty||0) : 0;
+   if(current + 1 > Number(p.stockQty)){
+     alert(`Only ${p.stockQty} vial${Number(p.stockQty)===1?" is":"s are"} available for ${p.name}.`);
+     return;
+   }
+ }
  if(item)item.qty++;else cart.push({...p,qty:1});
  updateCart();openCart();
 }
@@ -1059,7 +1091,15 @@ function updateCart(){
  }
 }
 function change(code,n){
- let x=cart.find(i=>i.code===code);if(!x)return;x.qty+=n;if(x.qty<=0)cart=cart.filter(i=>i.code!==code);updateCart()
+ let x=cart.find(i=>i.code===code);if(!x)return;
+ const p=products.find(i=>i.code===code);
+ if(n>0 && p && p.stockQty !== null && p.stockQty !== undefined && x.qty+1>Number(p.stockQty)){
+   alert(`Only ${p.stockQty} vial${Number(p.stockQty)===1?" is":"s are"} available for ${p.name}.`);
+   return;
+ }
+ x.qty+=n;
+ if(x.qty<=0)cart=cart.filter(i=>i.code!==code);
+ updateCart();
 }
 function openCart(){document.getElementById("drawer").classList.add("open");document.getElementById("overlay").classList.add("open")}
 function closeCart(){document.getElementById("drawer").classList.remove("open");document.getElementById("overlay").classList.remove("open")}
