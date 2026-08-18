@@ -677,6 +677,13 @@ nav a:hover::after{
 }
 </style>
 
+
+<style id="bulk10PricingStyles">
+.bulk10-label{margin-top:3px;font-size:9px;font-weight:700;color:#e0218a;white-space:normal}
+.bulk-cart-note{margin-top:5px;color:#d21c7d;font-size:10px;font-weight:700}
+.cart-item-subtotal{margin-top:4px;font-size:11px;color:#704356}
+</style>
+
 </head>
 <body>
 <div class="top">PEP CORE - BEAUTY • ON-HAND COLLECTION</div>
@@ -925,7 +932,9 @@ function openVariantModal(index){
  document.getElementById("variantList").innerHTML=g.items.map(p=>`
    <div class="variant-option">
     <div><div class="variant-option-name">${escapeHtml(p.name)}</div><div class="variant-option-code">${escapeHtml(p.code)}</div></div>
-    <div class="variant-option-price">₱${peso(p.price)}</div>
+    <div class="variant-option-price">₱${peso(p.price)}
+      ${p.bulk10Price ? `<div class="bulk10-label">🎀 10 vials: ₱${peso(p.bulk10Price)}</div>` : ""}
+    </div>
     ${p.oos ? `<button disabled>OUT OF STOCK</button>` : `
       <div class="variant-buy-row">
         <div class="variant-qty">
@@ -1004,13 +1013,37 @@ function updateDeliveryOptions(){
  updateCart();
 }
 
+function itemSubtotal(item){
+ const qty=Number(item.qty||0);
+ const regular=Number(item.price||0);
+ const bulk=Number(item.bulk10Price);
+
+ if(qty>=10 && Number.isFinite(bulk) && bulk>0){
+   const fullSets=Math.floor(qty/10);
+   const remainder=qty%10;
+   return fullSets*bulk + remainder*regular;
+ }
+ return qty*regular;
+}
+
+function itemPricingNote(item){
+ const qty=Number(item.qty||0);
+ const bulk=Number(item.bulk10Price);
+ if(qty>=10 && Number.isFinite(bulk) && bulk>0){
+   const sets=Math.floor(qty/10);
+   const remainder=qty%10;
+   return `🎀 ${sets} bulk set${sets>1?"s":""} of 10${remainder?` + ${remainder} regular vial${remainder>1?"s":""}`:""}`;
+ }
+ return "";
+}
+
 function updateCart(){
- const subtotal=cart.reduce((a,b)=>a+b.price*b.qty,0);
+ const subtotal=cart.reduce((a,b)=>a+itemSubtotal(b),0);
  const delivery=getDeliveryDetails();
  const grandTotal=subtotal+delivery.fee;
 
  document.getElementById("count").textContent=cart.reduce((a,b)=>a+b.qty,0);
- document.getElementById("cartItems").innerHTML=cart.length?cart.map(x=>`<div class="cart-item"><strong>${escapeHtml(x.name)}</strong><br>₱${peso(x.price)} × ${x.qty}<br><button class="qty" onclick="change('${String(x.code).replace(/'/g,"\\'")}',-1)">−</button> <button class="qty" onclick="change('${String(x.code).replace(/'/g,"\\'")}',1)">+</button></div>`).join(""):"<p>Your cart is empty.</p>";
+ document.getElementById("cartItems").innerHTML=cart.length?cart.map(x=>`<div class="cart-item"><strong>${escapeHtml(x.name)}</strong><br>₱${peso(x.price)} × ${x.qty}${itemPricingNote(x)?`<div class="bulk-cart-note">${itemPricingNote(x)}</div>`:""}<div class="cart-item-subtotal">Subtotal: ₱${peso(itemSubtotal(x))}</div><br><button class="qty" onclick="change('${String(x.code).replace(/'/g,"\\'")}',-1)">−</button> <button class="qty" onclick="change('${String(x.code).replace(/'/g,"\\'")}',1)">+</button></div>`).join(""):"<p>Your cart is empty.</p>";
 
  const subtotalEl=document.getElementById("subtotal");
  const totalEl=document.getElementById("total");
@@ -1085,10 +1118,15 @@ function submitOrder(){
  }
 
  const delivery=getDeliveryDetails();
- const merchandiseTotal=cart.reduce((a,b)=>a+b.price*b.qty,0);
+ const merchandiseTotal=cart.reduce((a,b)=>a+itemSubtotal(b),0);
  const deliverySummary=delivery.method==="Lalamove"
    ? "Delivery: Lalamove — fee paid by customer upon delivery"
    : `Delivery: J&T — ${delivery.region} — ₱${peso(delivery.fee)}`;
+
+ const bulkSummary=cart
+   .filter(x=>itemPricingNote(x))
+   .map(x=>`${x.name}: ${itemPricingNote(x)} = ₱${peso(itemSubtotal(x))}`)
+   .join("\n");
 
  const order={
    customer:name,
@@ -1105,6 +1143,7 @@ function submitOrder(){
      "\nCity/Municipality: " + city +
      "\nProvince: " + province +
      (landmark ? "\nLandmark: " + landmark : "") +
+     (bulkSummary ? "\nBulk pricing:\n" + bulkSummary : "") +
      (notes ? "\nCustomer notes: " + notes : "")
    ),
    items:cart.map(x=>({
@@ -1112,7 +1151,7 @@ function submitOrder(){
      name:x.name,
      qty:x.qty,
      unitPrice:x.price,
-     subtotal:x.price*x.qty
+     subtotal:itemSubtotal(x)
    })),
    total:merchandiseTotal+delivery.fee
  };
