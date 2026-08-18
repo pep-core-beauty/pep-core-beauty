@@ -717,6 +717,40 @@ nav a:hover::after{
 }
 </style>
 
+
+<style id="productImageDisplay">
+.card .pic{
+  overflow:hidden !important;
+  position:relative;
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  padding:0 !important;
+}
+.card .pic img{
+  width:100% !important;
+  height:100% !important;
+  object-fit:cover !important;
+  display:block;
+}
+.card .pic-placeholder{
+  padding:8px;
+  text-align:center;
+}
+.card .pic.image-fallback::after{
+  content:"";
+}
+.card .pic.image-fallback .pic-placeholder{
+  display:block;
+}
+@media(max-width:700px){
+  .card .pic{
+    height:92px !important;
+    min-height:92px !important;
+  }
+}
+</style>
+
 </head>
 <body>
 <div class="top">PEP CORE - BEAUTY • ON-HAND COLLECTION</div>
@@ -946,7 +980,14 @@ function render(){
    const p=g.items[0];
    return `
  <article class="card">
-  <div class="pic">${escapeHtml(g.family)}</div>
+  <div class="pic">
+    ${(() => {
+      const img = g.items.find(x => x.image && String(x.image).trim());
+      return img
+        ? `<img src="${escapeHtml(img.image)}" alt="${escapeHtml(g.family)}" loading="lazy" onerror="this.style.display='none';this.parentElement.classList.add('image-fallback');">`
+        : `<span class="pic-placeholder">${escapeHtml(g.family)}</span>`;
+    })()}
+  </div>
   <div class="card-body">
    <h3 class="product-name">${escapeHtml(g.family)}</h3>
    ${single?`<div class="code">${escapeHtml(p.code)}</div>`:`<div class="variant-count">${g.items.length} OPTIONS</div>`}
