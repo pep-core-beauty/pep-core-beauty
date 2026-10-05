@@ -1067,7 +1067,9 @@ function addVariantQty(code){
  variantQuantities[code]=1;
  updateCart();
  closeVariantModal();
- openCart();
+ // Keep mobile shoppers on the product grid after adding an item.
+ // Desktop keeps the existing behavior of opening the cart drawer.
+ if (window.innerWidth > 700) openCart();
 }
 
 function addVariant(code){
@@ -1085,7 +1087,9 @@ function add(code){
    }
  }
  if(item)item.qty++;else cart.push({...p,qty:1});
- updateCart();openCart();
+ updateCart();
+ // On mobile, add to cart without automatically opening the cart drawer.
+ if (window.innerWidth > 700) openCart();
 }
 function getDeliveryDetails(){
  const methodEl=document.getElementById("deliveryMethod");
