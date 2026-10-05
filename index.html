@@ -1275,8 +1275,10 @@ function submitOrder(){
  const send = (receipt) => {
    order.receipt=receipt||null;
 
-   // Native form POST to Apps Script. The response is loaded into a hidden iframe,
-   // so this works without CORS access from the browser.
+   const clientToken=(window.crypto && crypto.randomUUID)
+     ? crypto.randomUUID()
+     : (Date.now()+"-"+Math.random().toString(36).slice(2));
+
    let iframe=document.getElementById("orderSubmitFrame");
    if(!iframe){
      iframe=document.createElement("iframe");
@@ -1292,42 +1294,75 @@ function submitOrder(){
    form.target="orderSubmitFrame";
    form.style.display="none";
 
-   const input=document.createElement("input");
-   input.type="hidden";
-   input.name="payload";
-   input.value=JSON.stringify(order);
-   form.appendChild(input);
+   const payloadInput=document.createElement("input");
+   payloadInput.type="hidden";
+   payloadInput.name="payload";
+   payloadInput.value=JSON.stringify(order);
+   form.appendChild(payloadInput);
+
+   const tokenInput=document.createElement("input");
+   tokenInput.type="hidden";
+   tokenInput.name="clientToken";
+   tokenInput.value=clientToken;
+   form.appendChild(tokenInput);
+
    document.body.appendChild(form);
 
-   let submitted=false;
+   let finished=false;
+   let timeoutId=null;
+
+   const finishButton=()=>{
+     btn.disabled=false;
+     btn.textContent="SUBMIT ORDER";
+   };
    const cleanup=()=>{
+     window.removeEventListener("message",onOrderResult);
+     if(timeoutId) clearTimeout(timeoutId);
      if(form.parentNode) form.parentNode.removeChild(form);
    };
 
-   // Apps Script navigation is cross-origin, so we can't inspect its response.
-   // Give it a short window to receive the POST before confirming submission.
-   form.submit();
-   submitted=true;
-
-   setTimeout(()=>{
-     if(submitted){
-       const confirmationId = "PCB-" + new Date().toISOString().replace(/\D/g,"").slice(0,14) + "-" + Math.floor(1000 + Math.random()*9000);
-       document.getElementById("confirmationOrderId").textContent = confirmationId;
-       document.getElementById("confirmation").style.display = "flex";
-       const checkoutActions=document.getElementById("checkoutActions");
-       if(checkoutActions) checkoutActions.style.display="none";
-       cart=[];
-       updateCart();
-       document.getElementById("checkoutPanel").classList.remove("open");
-       document.getElementById("customerName").value="";
-       document.getElementById("customerContact").value="";
-       document.getElementById("notes").value="";
-       document.getElementById("receipt").value="";
-     }
+   const onOrderResult=(event)=>{
+     const data=event && event.data;
+     if(!data || data.type!=="PEP_CORE_ORDER_RESULT" || data.token!==clientToken) return;
+     if(finished) return;
+     finished=true;
      cleanup();
-     btn.disabled=false;
-     btn.textContent="SUBMIT ORDER";
-   },1500);
+     finishButton();
+
+     if(!data.ok){
+       alert("Your order was NOT submitted. " + (data.error || "Please try again."));
+       return;
+     }
+
+     document.getElementById("confirmationOrderId").textContent=data.orderId;
+     document.getElementById("confirmation").style.display="flex";
+     const checkoutActions=document.getElementById("checkoutActions");
+     if(checkoutActions) checkoutActions.style.display="none";
+
+     cart=[];
+     updateCart();
+     document.getElementById("checkoutPanel").classList.remove("open");
+     document.getElementById("customerName").value="";
+     document.getElementById("customerContact").value="";
+     document.getElementById("notes").value="";
+     document.getElementById("receipt").value="";
+
+     if(data.receiptWarning){
+       setTimeout(()=>alert("Order saved, but the receipt could not be uploaded. Please send your receipt to us manually.\n\n"+data.receiptWarning),150);
+     }
+   };
+
+   window.addEventListener("message",onOrderResult);
+
+   timeoutId=setTimeout(()=>{
+     if(finished) return;
+     finished=true;
+     cleanup();
+     finishButton();
+     alert("We could not confirm that your order was saved. Your cart has NOT been cleared. Please try again or contact us before resubmitting.");
+   },40000);
+
+   form.submit();
  };
 
  if(file){
