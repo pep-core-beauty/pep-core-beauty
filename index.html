@@ -1211,177 +1211,79 @@ function submitOrder(){
  const city=document.getElementById("city").value.trim();
  const province=document.getElementById("province").value.trim();
  const landmark=document.getElementById("landmark").value.trim();
- if(!name||!contact||!deliveryAddress||!barangay||!city||!province){
-   alert("Please complete your name, contact number, and delivery address.");
-   return;
- }
- if(ORDER_ENDPOINT.includes("PASTE_YOUR_")){
-   alert("The Google Sheet connection is not configured.");
-   return;
- }
+ if(!name||!contact||!deliveryAddress||!barangay||!city||!province){alert("Please complete your name, contact number, and delivery address.");return;}
+ if(ORDER_ENDPOINT.includes("PASTE_YOUR_")){alert("The Google Sheet connection is not configured.");return;}
 
  const payment=document.getElementById("payment").value;
  const notes=document.getElementById("notes").value;
  const file=document.getElementById("receipt").files[0];
-
- if(file && file.size>5*1024*1024){
-   alert("Receipt file must be 5 MB or smaller.");
-   return;
- }
+ if(file && file.size>5*1024*1024){alert("Receipt file must be 5 MB or smaller.");return;}
 
  const delivery=getDeliveryDetails();
  const merchandiseTotal=cart.reduce((a,b)=>a+itemSubtotal(b),0);
- const deliverySummary=delivery.method==="Lalamove"
-   ? "Delivery: Lalamove — fee paid by customer upon delivery"
-   : `Delivery: J&T — ${delivery.region} — ₱${peso(delivery.fee)}`;
-
- const bulkSummary=cart
-   .filter(x=>itemPricingNote(x))
-   .map(x=>`${x.name}: ${itemPricingNote(x)} = ₱${peso(itemSubtotal(x))}`)
-   .join("\n");
-
+ const deliverySummary=delivery.method==="Lalamove" ? "Delivery: Lalamove — fee paid by customer upon delivery" : `Delivery: J&T — ${delivery.region} — ₱${peso(delivery.fee)}`;
+ const bulkSummary=cart.filter(x=>itemPricingNote(x)).map(x=>`${x.name}: ${itemPricingNote(x)} = ₱${peso(itemSubtotal(x))}`).join("\n");
  const order={
-   customer:name,
-   contact:contact,
-   payment:payment,
-   deliveryMethod:delivery.method,
-   deliveryRegion:delivery.region,
-   shippingFee:delivery.fee,
-   notes:(
-     deliverySummary +
-     "\nContact: " + contact +
-     "\nAddress: " + deliveryAddress +
-     "\nBarangay: " + barangay +
-     "\nCity/Municipality: " + city +
-     "\nProvince: " + province +
-     (landmark ? "\nLandmark: " + landmark : "") +
-     (bulkSummary ? "\nBulk pricing:\n" + bulkSummary : "") +
-     (notes ? "\nCustomer notes: " + notes : "")
-   ),
-   items:cart.map(x=>({
-     code:x.code,
-     name:x.name,
-     qty:x.qty,
-     unitPrice:x.price,
-     subtotal:itemSubtotal(x)
-   })),
+   customer:name, contact:contact, payment:payment,
+   deliveryMethod:delivery.method, deliveryRegion:delivery.region, shippingFee:delivery.fee,
+   notes:(deliverySummary+"\nContact: "+contact+"\nAddress: "+deliveryAddress+"\nBarangay: "+barangay+"\nCity/Municipality: "+city+"\nProvince: "+province+(landmark?"\nLandmark: "+landmark:"")+(bulkSummary?"\nBulk pricing:\n"+bulkSummary:"")+(notes?"\nCustomer notes: "+notes:"")),
+   items:cart.map(x=>({code:x.code,name:x.name,qty:x.qty,unitPrice:x.price,subtotal:itemSubtotal(x)})),
    total:merchandiseTotal+delivery.fee
  };
 
  const btn=document.querySelector("#checkoutActions .submit");
- btn.disabled=true;
- btn.textContent="SUBMITTING...";
+ btn.disabled=true; btn.textContent="SUBMITTING...";
 
- const send = (receipt) => {
+ const send=(receipt)=>{
    order.receipt=receipt||null;
-
-   const clientToken=(window.crypto && crypto.randomUUID)
-     ? crypto.randomUUID()
-     : (Date.now()+"-"+Math.random().toString(36).slice(2));
+   const clientToken=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():(Date.now()+"-"+Math.random().toString(36).slice(2));
 
    let iframe=document.getElementById("orderSubmitFrame");
-   if(!iframe){
-     iframe=document.createElement("iframe");
-     iframe.name="orderSubmitFrame";
-     iframe.id="orderSubmitFrame";
-     iframe.style.display="none";
-     document.body.appendChild(iframe);
-   }
+   if(!iframe){iframe=document.createElement("iframe");iframe.name="orderSubmitFrame";iframe.id="orderSubmitFrame";iframe.style.display="none";document.body.appendChild(iframe);}
 
    const form=document.createElement("form");
-   form.method="POST";
-   form.action=ORDER_ENDPOINT;
-   form.target="orderSubmitFrame";
-   form.style.display="none";
-
-   const payloadInput=document.createElement("input");
-   payloadInput.type="hidden";
-   payloadInput.name="payload";
-   payloadInput.value=JSON.stringify(order);
-   form.appendChild(payloadInput);
-
-   const tokenInput=document.createElement("input");
-   tokenInput.type="hidden";
-   tokenInput.name="clientToken";
-   tokenInput.value=clientToken;
-   form.appendChild(tokenInput);
-
+   form.method="POST"; form.action=ORDER_ENDPOINT; form.target="orderSubmitFrame"; form.style.display="none";
+   const payloadInput=document.createElement("input"); payloadInput.type="hidden"; payloadInput.name="payload"; payloadInput.value=JSON.stringify(order); form.appendChild(payloadInput);
+   const tokenInput=document.createElement("input"); tokenInput.type="hidden"; tokenInput.name="clientToken"; tokenInput.value=clientToken; form.appendChild(tokenInput);
    document.body.appendChild(form);
 
-   let finished=false;
-   let timeoutId=null;
-
-   const finishButton=()=>{
-     btn.disabled=false;
-     btn.textContent="SUBMIT ORDER";
-   };
-   const cleanup=()=>{
-     window.removeEventListener("message",onOrderResult);
-     if(timeoutId) clearTimeout(timeoutId);
-     if(form.parentNode) form.parentNode.removeChild(form);
-   };
-
-   const onOrderResult=(event)=>{
-     const data=event && event.data;
-     if(!data || data.type!=="PEP_CORE_ORDER_RESULT" || data.token!==clientToken) return;
-     if(finished) return;
-     finished=true;
-     cleanup();
-     finishButton();
-
-     if(!data.ok){
-       alert("Your order was NOT submitted. " + (data.error || "Please try again."));
-       return;
-     }
-
+   let finished=false, pollTimer=null, timeoutTimer=null, activeScript=null;
+   const callbackName="pepOrderStatus_"+clientToken.replace(/[^A-Za-z0-9_$]/g,"_");
+   const finishButton=()=>{btn.disabled=false;btn.textContent="SUBMIT ORDER";};
+   const cleanup=()=>{if(pollTimer)clearTimeout(pollTimer);if(timeoutTimer)clearTimeout(timeoutTimer);if(activeScript&&activeScript.parentNode)activeScript.parentNode.removeChild(activeScript);try{delete window[callbackName];}catch(_){window[callbackName]=undefined;}if(form.parentNode)form.parentNode.removeChild(form);};
+   const succeed=(data)=>{
+     finished=true; cleanup(); finishButton();
      document.getElementById("confirmationOrderId").textContent=data.orderId;
      document.getElementById("confirmation").style.display="flex";
-     const checkoutActions=document.getElementById("checkoutActions");
-     if(checkoutActions) checkoutActions.style.display="none";
-
-     cart=[];
-     updateCart();
-     document.getElementById("checkoutPanel").classList.remove("open");
-     document.getElementById("customerName").value="";
-     document.getElementById("customerContact").value="";
-     document.getElementById("notes").value="";
-     document.getElementById("receipt").value="";
-
-     if(data.receiptWarning){
-       setTimeout(()=>alert("Order saved, but the receipt could not be uploaded. Please send your receipt to us manually.\n\n"+data.receiptWarning),150);
-     }
+     const checkoutActions=document.getElementById("checkoutActions"); if(checkoutActions)checkoutActions.style.display="none";
+     cart=[]; updateCart(); document.getElementById("checkoutPanel").classList.remove("open");
+     document.getElementById("customerName").value=""; document.getElementById("customerContact").value=""; document.getElementById("notes").value=""; document.getElementById("receipt").value="";
+     if(data.receiptWarning){setTimeout(()=>alert("Order saved, but the receipt could not be uploaded. Please send your receipt to us manually."),150);}
+   };
+   const fail=(msg)=>{finished=true;cleanup();finishButton();alert(msg);};
+   const poll=()=>{
+     if(finished)return;
+     window[callbackName]=(data)=>{
+       if(activeScript&&activeScript.parentNode)activeScript.parentNode.removeChild(activeScript); activeScript=null;
+       if(data&&data.done===true){if(data.ok)succeed(data);else fail("Your order was NOT submitted. "+(data.error||"Please try again."));return;}
+       pollTimer=setTimeout(poll,800);
+     };
+     const script=document.createElement("script"); activeScript=script;
+     script.src=ORDER_ENDPOINT+"?action=orderStatus&token="+encodeURIComponent(clientToken)+"&callback="+encodeURIComponent(callbackName)+"&_="+Date.now();
+     script.onerror=()=>{if(script.parentNode)script.parentNode.removeChild(script);activeScript=null;pollTimer=setTimeout(poll,1200);};
+     document.body.appendChild(script);
    };
 
-   window.addEventListener("message",onOrderResult);
-
-   timeoutId=setTimeout(()=>{
-     if(finished) return;
-     finished=true;
-     cleanup();
-     finishButton();
-     alert("We could not confirm that your order was saved. Your cart has NOT been cleared. Please try again or contact us before resubmitting.");
-   },40000);
-
-   form.submit();
+   timeoutTimer=setTimeout(()=>{if(finished)return;fail("Your order may have been received, but the website could not confirm it. Please check with us before submitting again to avoid a duplicate order.");},45000);
+   form.submit(); setTimeout(poll,700);
  };
 
  if(file){
    const reader=new FileReader();
-   reader.onload=()=>send({
-     name:file.name,
-     type:file.type,
-     size:file.size,
-     data:String(reader.result).split(",")[1]||""
-   });
-   reader.onerror=()=>{
-     btn.disabled=false;
-     btn.textContent="SUBMIT ORDER";
-     alert("Could not read the receipt file.");
-   };
+   reader.onload=()=>send({name:file.name,type:file.type,size:file.size,data:String(reader.result).split(",")[1]||""});
+   reader.onerror=()=>{btn.disabled=false;btn.textContent="SUBMIT ORDER";alert("Could not read the receipt file.");};
    reader.readAsDataURL(file);
- }else{
-   send(null);
- }
+ }else send(null);
 }
 function fileToBase64(file){
  return new Promise((resolve,reject)=>{
